@@ -29,7 +29,6 @@ export const getRelatedInfo = async(payload: { [key: string]: any }, octokit: Oc
     if (!('content_url' in data)) {
       return false;
     }
-
     return {
       projectId: extractProjectNumber(data['project_url']),
       issueNumber: extractIssueNumber(ensureNotNull(data['content_url'])),
@@ -44,6 +43,12 @@ export const getRelatedInfo = async(payload: { [key: string]: any }, octokit: Oc
     throw error;
   }
 };
+
+export const getState = async(issue: number, octokit: Octokit, context: Context): Promise<string> => (await octokit.issues.get({
+  owner: context.repo.owner,
+  repo: context.repo.repo,
+  'issue_number': issue,
+})).data.state;
 
 export const getLabels = async(issue: number, octokit: Octokit, context: Context): Promise<string[]> => (await octokit.issues.listLabelsOnIssue({
   owner: context.repo.owner,

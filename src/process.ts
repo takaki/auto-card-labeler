@@ -2,7 +2,7 @@ import {getConfig} from '@technote-space/github-action-config-helper';
 import {Octokit} from '@technote-space/github-action-helper/dist/types';
 import {Context} from '@actions/github/lib/context';
 import {Logger} from '@technote-space/github-action-log-helper';
-import {addLabels, getLabels, getRelatedInfo, removeLabels} from './utils/issue';
+import {addLabels, getLabels, getRelatedInfo, getState, removeLabels } from './utils/issue';
 import {getAddLabels, getRemoveLabels} from './utils/label';
 import {getColumnName, getConfigFilename, getProjectName} from './utils/misc';
 
@@ -31,24 +31,34 @@ export const execute = async(logger: Logger, octokit: Octokit, context: Context)
   const column = await getColumnName(context.payload.project_card.column_id, octokit);
   logger.displayStdout(column);
 
-  logger.startProcess('Getting current labels...');
-  const currentLabels  = await getLabels(issueNumber, octokit, context);
-  const labelsToRemove = getRemoveLabels(currentLabels, project, column, config);
-  const labelsToAdd    = getAddLabels(currentLabels, project, column, config);
+  const state = await getState(issueNumber, octokit, context);
+  logger.info(`Getting current state... ${state}`);
 
-  if (labelsToRemove.length) {
-    logger.startProcess('Removing labels...');
-    logger.displayStdout(labelsToRemove);
-    await removeLabels(issueNumber, labelsToRemove, octokit, context);
-  }
-  if (labelsToAdd.length) {
-    logger.startProcess('Adding labels...');
-    logger.displayStdout(labelsToAdd);
-    await addLabels(issueNumber, labelsToAdd, octokit, context);
-  }
-  logger.endProcess();
+  // FIXME: add getInput('ignoreClose'), and
+  if (state === 'open') {
+    try {
+      logger.startProcess('Getting current labels...');
+      const currentLabels = await getLabels(issueNumber, octokit, context);
+      const labelsToRemove = getRemoveLabels(currentLabels, project, column, config);
+      const labelsToAdd = getAddLabels(currentLabels, project, column, config);
 
-  logger.info('Removed count: %d', labelsToRemove.length);
-  logger.info('Added count: %d', labelsToAdd.length);
+      if (labelsToRemove.length) {
+        logger.startProcess('Removing labels...');
+        logger.displayStdout(labelsToRemove);
+        await removeLabels(issueNumber, labelsToRemove, octokit, context);
+      }
+      if (labelsToAdd.length) {
+        logger.startProcess('Adding labels...');
+        logger.displayStdout(labelsToAdd);
+        await addLabels(issueNumber, labelsToAdd, octokit, context);
+      }
+      logger.endProcess();
+
+      logger.info('Removed count: %d', labelsToRemove.length);
+      logger.info('Added count: %d', labelsToAdd.length);
+    } catch (err) {
+      logger.error('Got error:', err);
+    }
+  }
   return true;
 };
